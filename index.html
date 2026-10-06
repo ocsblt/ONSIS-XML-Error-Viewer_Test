@@ -6,7 +6,7 @@
 </head>
 
 <body>
-<h1 style="color:red;">TEST VERSION 123</h1>
+<h1 style="color:red;">TEST VERSION 124</h1>
 <h2>ONSIS XML Error Viewer Test</h2>
 
 <input type="file" id="xmlFile" accept=".xml">
@@ -18,6 +18,25 @@
 <script>
 
 document.getElementById('xmlFile').addEventListener('change', processXML);
+
+// ------------------------------------------------
+// Decode raw bytes: try UTF-8 first, then fall back
+// to the encoding declared in the XML header
+// (OnSIS files use ISO-8859-1).
+// ------------------------------------------------
+function decodeBuffer(buffer) {
+    try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    } catch (e) {
+        var head = new TextDecoder("windows-1252").decode(buffer.slice(0, 200));
+        var m = head.match(/encoding\s*=\s*["']([^"']+)["']/i);
+        try {
+            return new TextDecoder(m ? m[1] : "windows-1252").decode(buffer);
+        } catch (e2) {
+            return new TextDecoder("windows-1252").decode(buffer);
+        }
+    }
+}
 
 async function processXML(event) {
 
@@ -34,10 +53,10 @@ async function processXML(event) {
         console.log("File size:", file.size);
 
         // ------------------------------------------------
-        // STEP 2 - Read XML
+        // STEP 2 - Read XML (with encoding handling)
         // ------------------------------------------------
 
-        var xmlContent = await file.text();
+        var xmlContent = decodeBuffer(await file.arrayBuffer());
 
         console.log("STEP 2: XML file read successfully");
         console.log("First 200 characters:");
@@ -59,13 +78,8 @@ async function processXML(event) {
 
         if (parserError.length > 0) {
 
-            console.error(
-                "STEP 3 FAILED: XML parsing error"
-            );
-
-            console.error(
-                parserError[0].textContent
-            );
+            console.error("STEP 3 FAILED: XML parsing error");
+            console.error(parserError[0].textContent);
 
             alert(
                 "STEP 3 FAILED:\n\n" +
@@ -79,7 +93,7 @@ async function processXML(event) {
         console.log("STEP 3: XML parsed successfully");
 
         // ------------------------------------------------
-        // STEP 4 - Load XSL
+        // STEP 4 - Load XSL (with encoding handling)
         // ------------------------------------------------
 
         var response = await fetch("style_format.xsl");
@@ -92,7 +106,7 @@ async function processXML(event) {
             );
         }
 
-        var xslContent = await response.text();
+        var xslContent = decodeBuffer(await response.arrayBuffer());
 
         console.log("STEP 4: XSL file loaded successfully");
         console.log("First 300 characters:");
@@ -112,13 +126,8 @@ async function processXML(event) {
 
         if (xslParserError.length > 0) {
 
-            console.error(
-                "STEP 5 FAILED: XSL parsing error"
-            );
-
-            console.error(
-                xslParserError[0].textContent
-            );
+            console.error("STEP 5 FAILED: XSL parsing error");
+            console.error(xslParserError[0].textContent);
 
             alert(
                 "STEP 5 FAILED:\n\n" +
@@ -145,12 +154,9 @@ async function processXML(event) {
             );
         }
 
-        console.log(
-            "STEP 6: JavaScript XSLT processor library loaded"
-        );
+        console.log("STEP 6: JavaScript XSLT processor library loaded");
 
-        var xsltProcessor =
-            new XsltProcessorLib.XSLTProcessor();
+        var xsltProcessor = new XsltProcessorLib.XSLTProcessor();
 
         // ------------------------------------------------
         // STEP 7 - Import XSL
@@ -158,22 +164,16 @@ async function processXML(event) {
 
         xsltProcessor.importStylesheet(xslDocument);
 
-        console.log(
-            "STEP 7: XSLT stylesheet imported successfully"
-        );
+        console.log("STEP 7: XSLT stylesheet imported successfully");
 
         // ------------------------------------------------
         // STEP 8 - Transform
         // ------------------------------------------------
 
         var transformedContent =
-            xsltProcessor.transformToDocument(
-                xmlDocument
-            );
+            xsltProcessor.transformToDocument(xmlDocument);
 
-        console.log(
-            "STEP 8: XML transformed successfully"
-        );
+        console.log("STEP 8: XML transformed successfully");
 
         // ------------------------------------------------
         // STEP 9 - Display result
@@ -183,8 +183,7 @@ async function processXML(event) {
             transformedContent.getElementsByTagName("BODY")[0];
 
         if (!body) {
-            body =
-                transformedContent.getElementsByTagName("body")[0];
+            body = transformedContent.getElementsByTagName("body")[0];
         }
 
         if (body) {
@@ -199,17 +198,12 @@ async function processXML(event) {
                     .serializeToString(transformedContent);
         }
 
-        console.log(
-            "STEP 9: Result displayed successfully"
-        );
+        console.log("STEP 9: Result displayed successfully");
 
     }
     catch (error) {
 
-        console.error(
-            "PROCESSING ERROR:",
-            error
-        );
+        console.error("PROCESSING ERROR:", error);
 
         alert(
             "Processing failed.\n\n" +
