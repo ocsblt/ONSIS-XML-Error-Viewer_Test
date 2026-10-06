@@ -2,128 +2,56 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>OCSB XML Viewer</title>
-
-    <!-- XSLT 1.0 JavaScript processor -->
-    <script src="https://cdn.jsdelivr.net/npm/@tradik/xslt-processor@1/dist/xslt-processor.browser.min.js"></script>
+    <title>ONSIS XML Error Viewer</title>
 
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            padding: 10px;
+            font-family: Arial, sans-serif;
+            margin: 20px;
         }
 
         #logo {
-            height: 100px;
-            margin-right: 10px;
+            max-width: 300px;
+            margin-bottom: 20px;
         }
 
-        h1 {
-            margin: 0;
-            text-align: center;
-            flex-grow: 1;
-        }
-
-        #fileInput,
-        #readButton {
-            margin: 10px;
-        }
-
-        #fileInput {
-            display: inline-block;
-            vertical-align: middle;
-        }
-
-        #readButton {
-            display: inline-block;
-            vertical-align: middle;
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: 2px solid #4CAF50;
-            cursor: pointer;
-        }
-
-        #line {
-            width: 80%;
-            height: 2px;
-            background-color: #ccc;
-            margin: 20px;
+        #result {
+            margin-top: 20px;
         }
     </style>
 </head>
 
 <body>
 
-    <header>
-        <img id="logo" src="logo.jpg" alt="Logo">
-        <h1>View ONSIS XML Error File</h1>
-    </header>
+    <img id="logo" src="logo.jpg" alt="OCSB">
 
-    <div>
-        <input type="file" id="fileInput">
-        <button id="readButton">View XML File</button>
-    </div>
+    <h2>ONSIS XML Error Viewer</h2>
 
-    <div id="line"></div>
+    <input type="file" id="xmlFile" accept=".xml">
 
     <div id="result"></div>
 
+    <!-- JavaScript XSLT processor -->
+    <script src="https://cdn.jsdelivr.net/npm/@tradik/xslt-processor@1/dist/xslt-processor.browser.min.js"></script>
+
     <script>
+        document.getElementById('xmlFile').addEventListener('change', processXML);
 
-        // Decode text using ISO-8859-1.
-        // This matches the encoding declared in style_format.xsl
-        // and supports characters such as é, è, à, ç, etc.
-        function decodeIso88591(buffer) {
-            var decoder = new TextDecoder('iso-8859-1');
-            return decoder.decode(buffer);
-        }
+        async function processXML(event) {
 
-        async function readXMLFile() {
-
-            var input = document.getElementById('fileInput');
-            var file = input.files[0];
+            var file = event.target.files[0];
 
             if (!file) {
-                alert('Please select an XML file.');
                 return;
             }
 
             try {
 
-                // Read the selected XML file as binary data
-                // so that we can correctly handle its character encoding.
-                var xmlBuffer = await file.arrayBuffer();
+                // Read the XML file as UTF-8.
+                // This preserves French accented characters such as é.
+                var xmlContent = await file.text();
 
-                // Decode XML as ISO-8859-1
-                var xmlContent = decodeIso88591(xmlBuffer);
-
-                // Load the XSLT file
-                var response = await fetch('style_format.xsl');
-
-                if (!response.ok) {
-                    throw new Error(
-                        'Unable to load style_format.xsl. HTTP status: ' +
-                        response.status
-                    );
-                }
-
-                // Read XSLT as binary data
-                var xslBuffer = await response.arrayBuffer();
-
-                // Decode XSLT using ISO-8859-1
-                var xslContent = decodeIso88591(xslBuffer);
-
-                // Parse XML and XSLT
+                // Parse XML
                 var parser = new DOMParser();
 
                 var xmlDocument = parser.parseFromString(
@@ -131,45 +59,55 @@
                     'application/xml'
                 );
 
+                // Check whether XML parsing failed
+                var parserError =
+                    xmlDocument.getElementsByTagName('parsererror');
+
+                if (parserError.length > 0) {
+                    alert(
+                        'Unable to process the XML file. ' +
+                        'The selected XML file could not be parsed.'
+                    );
+                    return;
+                }
+
+                // Load the XSLT file
+                var response = await fetch('style_format.xsl');
+
+                if (!response.ok) {
+                    throw new Error(
+                        'Unable to load style_format.xsl'
+                    );
+                }
+
+                var xslContent = await response.text();
+
+                // Parse XSLT
                 var xslDocument = parser.parseFromString(
                     xslContent,
                     'application/xml'
                 );
 
-                // Check for XML parsing errors
-                var xmlError = xmlDocument.querySelector('parsererror');
+                var xslParserError =
+                    xslDocument.getElementsByTagName('parsererror');
 
-                if (xmlError) {
+                if (xslParserError.length > 0) {
                     throw new Error(
-                        'The selected XML file could not be parsed.'
+                        'style_format.xsl could not be parsed.'
                     );
                 }
 
-                var xslError = xslDocument.querySelector('parsererror');
-
-                if (xslError) {
-                    throw new Error(
-                        'The XSLT file could not be parsed.'
-                    );
-                }
-
-                // Use the JavaScript XSLT processor
-                // instead of the browser's native XSLTProcessor.
+                // Use JavaScript XSLT processor
                 var xsltProcessor =
                     new XsltProcessorLib.XSLTProcessor();
 
                 xsltProcessor.importStylesheet(xslDocument);
 
-                // Transform the XML
+                // Transform XML
                 var transformedContent =
                     xsltProcessor.transformToDocument(xmlDocument);
 
-                var result = document.getElementById('result');
-
-                result.innerHTML = '';
-
-                // The existing XSLT generates a complete HTML document.
-                // Display the contents of its BODY.
+                // Get the BODY from the transformed document
                 var body =
                     transformedContent.getElementsByTagName('BODY')[0];
 
@@ -179,9 +117,10 @@
                 }
 
                 if (body) {
-                    result.innerHTML = body.innerHTML;
+                    document.getElementById('result').innerHTML =
+                        body.innerHTML;
                 } else {
-                    result.innerHTML =
+                    document.getElementById('result').innerHTML =
                         new XMLSerializer()
                             .serializeToString(transformedContent);
                 }
@@ -192,15 +131,10 @@
 
                 alert(
                     'Unable to process the XML file.\n\n' +
-                    error.message
+                    'Error: ' + error.message
                 );
             }
         }
-
-        document
-            .getElementById('readButton')
-            .addEventListener('click', readXMLFile);
-
     </script>
 
 </body>
