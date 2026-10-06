@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>OCSB XML Viewer</title>
 
-    <!-- XSLT 1.0 JavaScript processor/polyfill -->
+    <!-- XSLT 1.0 JavaScript processor -->
     <script src="https://cdn.jsdelivr.net/npm/@tradik/xslt-processor@1/dist/xslt-processor.browser.min.js"></script>
 
     <style>
@@ -79,6 +79,15 @@
     <div id="result"></div>
 
     <script>
+
+        // Decode text using ISO-8859-1.
+        // This matches the encoding declared in style_format.xsl
+        // and supports characters such as é, è, à, ç, etc.
+        function decodeIso88591(buffer) {
+            var decoder = new TextDecoder('iso-8859-1');
+            return decoder.decode(buffer);
+        }
+
         async function readXMLFile() {
 
             var input = document.getElementById('fileInput');
@@ -91,8 +100,12 @@
 
             try {
 
-                // Read the selected XML file
-                var xmlContent = await file.text();
+                // Read the selected XML file as binary data
+                // so that we can correctly handle its character encoding.
+                var xmlBuffer = await file.arrayBuffer();
+
+                // Decode XML as ISO-8859-1
+                var xmlContent = decodeIso88591(xmlBuffer);
 
                 // Load the XSLT file
                 var response = await fetch('style_format.xsl');
@@ -104,7 +117,11 @@
                     );
                 }
 
-                var xslContent = await response.text();
+                // Read XSLT as binary data
+                var xslBuffer = await response.arrayBuffer();
+
+                // Decode XSLT using ISO-8859-1
+                var xslContent = decodeIso88591(xslBuffer);
 
                 // Parse XML and XSLT
                 var parser = new DOMParser();
@@ -136,54 +153,37 @@
                     );
                 }
 
-                /*
-                 * Use the JavaScript XSLT processor.
-                 *
-                 * The library provides a browser-compatible
-                 * XSLTProcessor implementation.
-                 */
+                // Use the JavaScript XSLT processor
+                // instead of the browser's native XSLTProcessor.
                 var xsltProcessor =
                     new XsltProcessorLib.XSLTProcessor();
 
                 xsltProcessor.importStylesheet(xslDocument);
 
-                // Transform the XML using the XSLT
+                // Transform the XML
                 var transformedContent =
                     xsltProcessor.transformToDocument(xmlDocument);
 
-                // Display the transformed HTML
                 var result = document.getElementById('result');
 
                 result.innerHTML = '';
 
-                if (transformedContent.documentElement) {
+                // The existing XSLT generates a complete HTML document.
+                // Display the contents of its BODY.
+                var body =
+                    transformedContent.getElementsByTagName('BODY')[0];
 
-                    /*
-                     * The existing XSLT generates a complete HTML
-                     * document (<HTML><BODY>...</BODY></HTML>).
-                     *
-                     * We only need the contents of its BODY here.
-                     */
-                    var body =
-                        transformedContent.getElementsByTagName('BODY')[0];
+                if (!body) {
+                    body =
+                        transformedContent.getElementsByTagName('body')[0];
+                }
 
-                    if (!body) {
-                        body =
-                            transformedContent.getElementsByTagName('body')[0];
-                    }
-
-                    if (body) {
-                        result.innerHTML = body.innerHTML;
-                    } else {
-                        result.innerHTML =
-                            new XMLSerializer()
-                                .serializeToString(transformedContent);
-                    }
-
+                if (body) {
+                    result.innerHTML = body.innerHTML;
                 } else {
-                    throw new Error(
-                        'The XSLT transformation did not produce a result.'
-                    );
+                    result.innerHTML =
+                        new XMLSerializer()
+                            .serializeToString(transformedContent);
                 }
 
             } catch (error) {
@@ -200,6 +200,7 @@
         document
             .getElementById('readButton')
             .addEventListener('click', readXMLFile);
+
     </script>
 
 </body>
