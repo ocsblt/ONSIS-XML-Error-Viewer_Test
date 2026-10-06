@@ -2,140 +2,223 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>ONSIS XML Error Viewer</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-
-        #logo {
-            max-width: 300px;
-            margin-bottom: 20px;
-        }
-
-        #result {
-            margin-top: 20px;
-        }
-    </style>
+    <title>ONSIS XML Error Viewer Test</title>
 </head>
 
 <body>
 
-    <img id="logo" src="logo.jpg" alt="OCSB">
+<h2>ONSIS XML Error Viewer Test</h2>
 
-    <h2>ONSIS XML Error Viewer</h2>
+<input type="file" id="xmlFile" accept=".xml">
 
-    <input type="file" id="xmlFile" accept=".xml">
+<div id="result"></div>
 
-    <div id="result"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tradik/xslt-processor@1/dist/xslt-processor.browser.min.js"></script>
 
-    <!-- JavaScript XSLT processor -->
-    <script src="https://cdn.jsdelivr.net/npm/@tradik/xslt-processor@1/dist/xslt-processor.browser.min.js"></script>
+<script>
 
-    <script>
-        document.getElementById('xmlFile').addEventListener('change', processXML);
+document.getElementById('xmlFile').addEventListener('change', processXML);
 
-        async function processXML(event) {
+async function processXML(event) {
 
-            var file = event.target.files[0];
+    var file = event.target.files[0];
 
-            if (!file) {
-                return;
-            }
+    if (!file) {
+        return;
+    }
 
-            try {
+    try {
 
-                // Read the XML file as UTF-8.
-                // This preserves French accented characters such as é.
-                var xmlContent = await file.text();
+        console.log("STEP 1: XML file selected");
+        console.log("File name:", file.name);
+        console.log("File size:", file.size);
 
-                // Parse XML
-                var parser = new DOMParser();
+        // ------------------------------------------------
+        // STEP 2 - Read XML
+        // ------------------------------------------------
 
-                var xmlDocument = parser.parseFromString(
-                    xmlContent,
-                    'application/xml'
-                );
+        var xmlContent = await file.text();
 
-                // Check whether XML parsing failed
-                var parserError =
-                    xmlDocument.getElementsByTagName('parsererror');
+        console.log("STEP 2: XML file read successfully");
+        console.log("First 200 characters:");
+        console.log(xmlContent.substring(0, 200));
 
-                if (parserError.length > 0) {
-                    alert(
-                        'Unable to process the XML file. ' +
-                        'The selected XML file could not be parsed.'
-                    );
-                    return;
-                }
+        // ------------------------------------------------
+        // STEP 3 - Parse XML
+        // ------------------------------------------------
 
-                // Load the XSLT file
-                var response = await fetch('style_format.xsl');
+        var parser = new DOMParser();
 
-                if (!response.ok) {
-                    throw new Error(
-                        'Unable to load style_format.xsl'
-                    );
-                }
+        var xmlDocument = parser.parseFromString(
+            xmlContent,
+            "application/xml"
+        );
 
-                var xslContent = await response.text();
+        var parserError =
+            xmlDocument.getElementsByTagName("parsererror");
 
-                // Parse XSLT
-                var xslDocument = parser.parseFromString(
-                    xslContent,
-                    'application/xml'
-                );
+        if (parserError.length > 0) {
 
-                var xslParserError =
-                    xslDocument.getElementsByTagName('parsererror');
+            console.error(
+                "STEP 3 FAILED: XML parsing error"
+            );
 
-                if (xslParserError.length > 0) {
-                    throw new Error(
-                        'style_format.xsl could not be parsed.'
-                    );
-                }
+            console.error(
+                parserError[0].textContent
+            );
 
-                // Use JavaScript XSLT processor
-                var xsltProcessor =
-                    new XsltProcessorLib.XSLTProcessor();
+            alert(
+                "STEP 3 FAILED:\n\n" +
+                "The XML file could not be parsed.\n\n" +
+                parserError[0].textContent
+            );
 
-                xsltProcessor.importStylesheet(xslDocument);
-
-                // Transform XML
-                var transformedContent =
-                    xsltProcessor.transformToDocument(xmlDocument);
-
-                // Get the BODY from the transformed document
-                var body =
-                    transformedContent.getElementsByTagName('BODY')[0];
-
-                if (!body) {
-                    body =
-                        transformedContent.getElementsByTagName('body')[0];
-                }
-
-                if (body) {
-                    document.getElementById('result').innerHTML =
-                        body.innerHTML;
-                } else {
-                    document.getElementById('result').innerHTML =
-                        new XMLSerializer()
-                            .serializeToString(transformedContent);
-                }
-
-            } catch (error) {
-
-                console.error(error);
-
-                alert(
-                    'Unable to process the XML file.\n\n' +
-                    'Error: ' + error.message
-                );
-            }
+            return;
         }
-    </script>
+
+        console.log("STEP 3: XML parsed successfully");
+
+        // ------------------------------------------------
+        // STEP 4 - Load XSL
+        // ------------------------------------------------
+
+        var response = await fetch("style_format.xsl");
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Could not load style_format.xsl. HTTP status: " +
+                response.status
+            );
+        }
+
+        var xslContent = await response.text();
+
+        console.log("STEP 4: XSL file loaded successfully");
+        console.log("First 300 characters:");
+        console.log(xslContent.substring(0, 300));
+
+        // ------------------------------------------------
+        // STEP 5 - Parse XSL
+        // ------------------------------------------------
+
+        var xslDocument = parser.parseFromString(
+            xslContent,
+            "application/xml"
+        );
+
+        var xslParserError =
+            xslDocument.getElementsByTagName("parsererror");
+
+        if (xslParserError.length > 0) {
+
+            console.error(
+                "STEP 5 FAILED: XSL parsing error"
+            );
+
+            console.error(
+                xslParserError[0].textContent
+            );
+
+            alert(
+                "STEP 5 FAILED:\n\n" +
+                "style_format.xsl could not be parsed.\n\n" +
+                xslParserError[0].textContent
+            );
+
+            return;
+        }
+
+        console.log("STEP 5: XSL parsed successfully");
+
+        // ------------------------------------------------
+        // STEP 6 - Create XSLT processor
+        // ------------------------------------------------
+
+        if (
+            typeof XsltProcessorLib === "undefined" ||
+            !XsltProcessorLib.XSLTProcessor
+        ) {
+
+            throw new Error(
+                "The JavaScript XSLT processor library was not loaded."
+            );
+        }
+
+        console.log(
+            "STEP 6: JavaScript XSLT processor library loaded"
+        );
+
+        var xsltProcessor =
+            new XsltProcessorLib.XSLTProcessor();
+
+        // ------------------------------------------------
+        // STEP 7 - Import XSL
+        // ------------------------------------------------
+
+        xsltProcessor.importStylesheet(xslDocument);
+
+        console.log(
+            "STEP 7: XSLT stylesheet imported successfully"
+        );
+
+        // ------------------------------------------------
+        // STEP 8 - Transform
+        // ------------------------------------------------
+
+        var transformedContent =
+            xsltProcessor.transformToDocument(
+                xmlDocument
+            );
+
+        console.log(
+            "STEP 8: XML transformed successfully"
+        );
+
+        // ------------------------------------------------
+        // STEP 9 - Display result
+        // ------------------------------------------------
+
+        var body =
+            transformedContent.getElementsByTagName("BODY")[0];
+
+        if (!body) {
+            body =
+                transformedContent.getElementsByTagName("body")[0];
+        }
+
+        if (body) {
+
+            document.getElementById("result").innerHTML =
+                body.innerHTML;
+
+        } else {
+
+            document.getElementById("result").innerHTML =
+                new XMLSerializer()
+                    .serializeToString(transformedContent);
+        }
+
+        console.log(
+            "STEP 9: Result displayed successfully"
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "PROCESSING ERROR:",
+            error
+        );
+
+        alert(
+            "Processing failed.\n\n" +
+            error.message
+        );
+    }
+}
+
+</script>
 
 </body>
 </html>
